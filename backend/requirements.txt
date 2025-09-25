@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+torch
+torchvision
+spectral
+pillow
+numpy
+pandas
+python-multipart
+aiofiles
