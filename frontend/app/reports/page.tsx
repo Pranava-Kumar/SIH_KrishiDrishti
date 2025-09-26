@@ -2,16 +2,66 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Calendar, AlertTriangle, Leaf, TrendingUp, Droplets, Wrench, Thermometer } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { 
+  Download, 
+  Calendar, 
+  AlertTriangle, 
+  Leaf, 
+  TrendingUp, 
+  Droplets, 
+  FileText,
+  Printer
+} from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import Link from 'next/link';
 
-// Mock data for reports
-const mockReportData = {
+// Define types for the report data
+type ReportData = {
+  summary: {
+    healthScore: number;
+    riskLevel: string;
+    totalAlerts: number;
+    ndviAvg: number;
+    lastUpdated: string;
+  };
+  fieldInfo: {
+    name: string;
+    cropType: string;
+    area: string;
+    plantingDate: string;
+    location: string;
+  };
+  alerts: Array<{
+    id: number;
+    type: string;
+    zone: string;
+    severity: string;
+    message: string;
+    date: string;
+  }>;
+  recommendations: string[];
+  trendData: Array<{
+    date: string;
+    ndvi: number;
+    temp: number;
+    moisture: number;
+  }>;
+};
+
+// Mock data for the report
+const mockReportData: ReportData = {
+  summary: {
+    healthScore: 82,
+    riskLevel: "Medium",
+    totalAlerts: 3,
+    ndviAvg: 0.65,
+    lastUpdated: "2023-02-19T14:30:00Z"
+  },
   fieldInfo: {
     name: "Test Field #1",
     cropType: "Corn",
@@ -19,40 +69,32 @@ const mockReportData = {
     plantingDate: "2023-03-15",
     location: "Pune, Maharashtra"
   },
-  summary: {
-    healthScore: 78,
-    riskLevel: "Medium",
-    totalAlerts: 8,
-    ndviAverage: 0.64,
-    lastUpdated: "2023-02-19"
-  },
-  trendData: [
-    { date: '2023-01-01', ndvi: 0.42, temp: 18.5, moisture: 28.3 },
-    { date: '2023-01-08', ndvi: 0.48, temp: 19.2, moisture: 30.1 },
-    { date: '2023-01-15', ndvi: 0.55, temp: 20.1, moisture: 29.8 },
-    { date: '2023-01-22', ndvi: 0.61, temp: 22.4, moisture: 32.4 },
-    { date: '2023-01-29', ndvi: 0.65, temp: 24.6, moisture: 35.2 },
-    { date: '2023-02-05', ndvi: 0.68, temp: 21.3, moisture: 31.7 },
-    { date: '2023-02-12', ndvi: 0.72, temp: 19.8, moisture: 29.5 },
-    { date: '2023-02-19', ndvi: 0.75, temp: 20.7, moisture: 30.9 },
-  ] as { date: string; ndvi: number; temp: number; moisture: number }[],
   alerts: [
-    { id: 1, type: "Pest Risk", zone: "Zone 3", severity: "High", date: "2023-02-19" },
-    { id: 2, type: "Stress", zone: "North Field", severity: "Medium", date: "2023-02-18" },
-    { id: 3, type: "Disease", zone: "Southwest", severity: "Medium", date: "2023-02-17" },
+    { id: 1, type: "Pest Risk", zone: "Zone 3", severity: "High", message: "Aphid risk detected", date: "2023-02-19" },
+    { id: 2, type: "Stress", zone: "North Field", severity: "Medium", message: "Water stress identified", date: "2023-02-18" },
+    { id: 3, type: "Disease", zone: "Southwest Section", severity: "Medium", message: "Fungal infection detected", date: "2023-02-17" }
   ],
   recommendations: [
-    "Apply nitrogen-rich fertilizer to address nutrient deficiency",
-    "Monitor Zone 3 closely for aphid infestation",
-    "Adjust irrigation schedule to maintain optimal soil moisture"
+    "Apply Imidacloprid 17.8% SL at 1.5 ml/liter of water. Focus treatment on Zone 3.",
+    "Increase irrigation frequency by 25%. Monitor soil moisture levels closely.",
+    "Apply copper-based fungicide. Ensure proper field drainage."
+  ],
+  trendData: [
+    { date: "2023-01-01", ndvi: 0.45, temp: 22, moisture: 30 },
+    { date: "2023-01-08", ndvi: 0.52, temp: 24, moisture: 32 },
+    { date: "2023-01-15", ndvi: 0.61, temp: 26, moisture: 28 },
+    { date: "2023-01-22", ndvi: 0.65, temp: 25, moisture: 31 },
+    { date: "2023-01-29", ndvi: 0.68, temp: 23, moisture: 33 },
+    { date: "2023-02-05", ndvi: 0.71, temp: 21, moisture: 30 },
+    { date: "2023-02-12", ndvi: 0.73, temp: 20, moisture: 29 },
+    { date: "2023-02-19", ndvi: 0.75, temp: 22, moisture: 31 }
   ]
 };
 
 export default function ReportsPage() {
-  const [reportData, setReportData] = useState<typeof mockReportData | null>(null);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [reportType, setReportType] = useState("field");
-  const reportRef = useRef(null);
+  const [timeRange, setTimeRange] = useState("last_month");
 
   useEffect(() => {
     // In a real app, this would fetch from an API
@@ -62,300 +104,363 @@ export default function ReportsPage() {
     }, 500);
   }, []);
 
-  const handleDownload = () => {
-    // In a real implementation, this would generate and download a PDF
-    alert("Report download would start in a real implementation");
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Generating report...</p>
+          <p className="mt-4 text-gray-600">Loading report...</p>
         </div>
       </div>
     );
   }
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadPDF = () => {
+    // In a real app, this would generate and download a PDF
+    alert("PDF report download would start in a real implementation");
+  };
+
   return (
     <div className="container mx-auto p-4 max-w-7xl">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Field Health Reports</h1>
-        <div className="flex gap-4">
-          <Select value={reportType} onValueChange={setReportType}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select report type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="field">Field Report</SelectItem>
-              <SelectItem value="trend">Trend Analysis</SelectItem>
-              <SelectItem value="alert">Alert Summary</SelectItem>
-              <SelectItem value="comprehensive">Comprehensive</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Export Report
+      {/* Print Styles */}
+      <style jsx global>{`
+        @media print {
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          .no-print {
+            display: none !important;
+          }
+          
+          .print-header {
+            display: block !important;
+          }
+        }
+        
+        .print-header {
+          display: none;
+        }
+      `}</style>
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Field Health Report</h1>
+          <p className="text-gray-600">
+            Comprehensive analysis for {reportData?.fieldInfo.name || "Unknown Field"}
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap gap-3 no-print">
+          <Button onClick={handlePrint} variant="outline">
+            <Printer className="h-4 w-4 mr-2" />
+            Print Report
           </Button>
+          
+          <Button onClick={handleDownloadPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            Download PDF
+          </Button>
+          
+          <Link href="/dashboard">
+            <Button variant="outline">
+              <Leaf className="h-4 w-4 mr-2" />
+              Dashboard
+            </Button>
+          </Link>
         </div>
       </div>
       
-      <div ref={reportRef} className="space-y-8">
-        {/* Executive Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Leaf className="h-5 w-5" />
-              Executive Summary
-            </CardTitle>
-            <CardDescription>Field health overview and key metrics</CardDescription>
+      {/* Print Header */}
+      <div className="print-header mb-8 p-6 bg-white rounded-lg shadow">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">KrishiDrishti Field Health Report</h1>
+            <p className="text-gray-600">
+              Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold">{reportData?.fieldInfo.name}</p>
+            <p className="text-gray-600">{reportData?.fieldInfo.location}</p>
+          </div>
+        </div>
+      </div>
+      
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Health Score</CardTitle>
+            <Leaf className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-3xl font-bold text-blue-600">{reportData ? reportData.summary.healthScore : "N/A"}</div>
-                <div className="text-sm text-gray-600">Health Score</div>
-              </div>
-              <Badge className={
-                reportData?.summary.riskLevel === "High" ? "bg-red-100 text-red-800" :
-                reportData?.summary.riskLevel === "Medium" ? "bg-yellow-100 text-yellow-800" :
-                "bg-green-100 text-green-800"
-              }>
-                {reportData?.summary.riskLevel || "N/A"} Risk
-              </Badge>
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="text-3xl font-bold text-red-600">{reportData ? reportData.summary.totalAlerts : "N/A"}</div>
-                <div className="text-sm text-gray-600">Active Alerts</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{reportData ? reportData.summary.ndviAverage : "N/A"}</div>
-                <div className="text-sm text-gray-600">NDVI Average</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-center">
-                  <Calendar className="h-5 w-5 text-gray-600 mr-1" />
-                  <span className="text-sm text-gray-600">Updated</span>
-                </div>
-                <div className="text-sm font-medium">{reportData ? reportData.summary.lastUpdated : "N/A"}</div>
-              </div>
+            <div className="text-2xl font-bold">
+              {reportData?.summary.healthScore || "N/A"}/100
             </div>
+            <p className="text-xs text-gray-600">Overall field health</p>
           </CardContent>
         </Card>
         
+        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Risk Level</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <Badge className={
+              reportData?.summary.riskLevel === "High" ? "bg-red-100 text-red-800" :
+              reportData?.summary.riskLevel === "Medium" ? "bg-yellow-100 text-yellow-800" :
+              "bg-green-100 text-green-800"
+            }>
+              {reportData?.summary.riskLevel || "N/A"} Risk
+            </Badge>
+            <p className="text-xs text-gray-600 mt-2">Current threat level</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">NDVI Average</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {reportData ? reportData.summary.ndviAvg.toFixed(2) : "N/A"}
+            </div>
+            <p className="text-xs text-gray-600">Normalized Difference Vegetation Index</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Active Alerts</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {reportData?.summary.totalAlerts || "N/A"}
+            </div>
+            <p className="text-xs text-gray-600">Requires attention</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Last Updated</CardTitle>
+            <Calendar className="h-4 w-4 text-gray-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {reportData ? new Date(reportData.summary.lastUpdated).toLocaleDateString() : "N/A"}
+            </div>
+            <p className="text-xs text-gray-600">Analysis date</p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Field Information */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="lg:col-span-1">
           <Card>
             <CardHeader>
-              <CardTitle>Field Information</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Field Information
+              </CardTitle>
+              <CardDescription>Basic details about the analyzed field</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Field Name:</span>
-                <div className="font-medium">{reportData ? reportData.fieldInfo.name : "N/A"}</div>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Crop Type:</span>
-                <span className="font-medium">{reportData ? reportData.fieldInfo.cropType : "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Area:</span>
-                <span className="font-medium">{reportData ? reportData.fieldInfo.area : "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Planting Date:</span>
-                <span className="font-medium">{reportData ? reportData.fieldInfo.plantingDate : "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Location:</span>
-                <span className="font-medium">{reportData ? reportData.fieldInfo.location : "N/A"}</span>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="font-medium">Field Name</div>
+                  <div className="text-gray-600">{reportData?.fieldInfo.name || "N/A"}</div>
+                </div>
+                
+                <div>
+                  <div className="font-medium">Crop Type</div>
+                  <div className="text-gray-600">
+                    <span className="font-medium">{reportData?.fieldInfo.cropType || "N/A"}</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="font-medium">Area</div>
+                  <div className="text-gray-600">{reportData?.fieldInfo.area || "N/A"}</div>
+                </div>
+                
+                <div>
+                  <div className="font-medium">Planting Date</div>
+                  <div className="text-gray-600">
+                    {reportData?.fieldInfo.plantingDate 
+                      ? new Date(reportData.fieldInfo.plantingDate).toLocaleDateString() 
+                      : "N/A"}
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="font-medium">Location</div>
+                  <div className="text-gray-600">{reportData?.fieldInfo.location || "N/A"}</div>
+                </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
+          {/* Recommendations */}
+          <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Recent Alerts</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Leaf className="h-5 w-5" />
+                Recommendations
+              </CardTitle>
+              <CardDescription>Actionable insights for field management</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                                  {reportData && reportData.alerts.map((alert: typeof mockReportData.alerts[0], index: number) => (
-                  <div key={alert.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <AlertTriangle className={
-                        alert.severity === "High" ? "h-5 w-5 text-red-600 mr-2" :
-                        alert.severity === "Medium" ? "h-5 w-5 text-yellow-600 mr-2" :
-                        "h-5 w-5 text-green-600 mr-2"
-                      } />
-                      <div>
-                        <div className="font-medium">{alert.type}</div>
-                        <div className="text-sm text-gray-600">{alert.zone}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium">{alert.date}</div>
-                      <Badge className={
-                        alert.severity === "High" ? "bg-red-100 text-red-800" :
-                        alert.severity === "Medium" ? "bg-yellow-100 text-yellow-800" :
-                        "bg-green-100 text-green-800"
-                      }>
-                        {alert.severity}
-                      </Badge>
-                    </div>
+                {reportData?.recommendations.map((rec: string, index: number) => (
+                  <div key={index} className="flex items-start">
+                    <div className="mt-1 w-2 h-2 bg-green-500 rounded-full mr-3 flex-shrink-0"></div>
+                    <p className="text-gray-700 text-sm">{rec}</p>
                   </div>
-                ))}
+                )) || (
+                  <p className="text-gray-600 text-center py-4">No recommendations available</p>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
         
-        {/* Trend Analysis */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Trend Analysis
-            </CardTitle>
-            <CardDescription>NDVI, temperature, and soil moisture trends over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={reportData ? reportData.trendData : []}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
-                    tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip 
-                    formatter={(value, name) => {
-                      if (name === 'ndvi') return [Number(value).toFixed(2), 'NDVI'];
-                      if (name === 'temp') return [Number(value).toFixed(1) + '°C', 'Temperature'];
-                      if (name === 'moisture') return [Number(value).toFixed(1) + '%', 'Moisture'];
-                      return [Number(value).toFixed(2), name];
-                    }}
-                    labelFormatter={(value) => `Date: ${new Date(value).toLocaleDateString()}`}
-                  />
-                  <Legend />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="ndvi" 
-                    name="NDVI" 
-                    stroke="#3b82f6" 
-                    strokeWidth={2}
-                    activeDot={{ r: 8 }} 
-                  />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="temp" 
-                    name="Temperature (°C)" 
-                    stroke="#ef4444" 
-                    strokeWidth={2}
-                  />
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="moisture" 
-                    name="Moisture (%)" 
-                    stroke="#10b981" 
-                    strokeWidth={2}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Recommendations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recommendations</CardTitle>
-            <CardDescription>Actionable insights for optimal field management</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-                                {reportData && reportData.recommendations.map((rec: string, index: number) => (
-                <div key={index} className="flex items-start p-4 bg-blue-50 rounded-lg">
-                  <Wrench className="h-5 w-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
-                  <div>{rec}</div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Additional Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Charts */}
+        <div className="lg:col-span-2">
+          {/* Trend Chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Zonal Analysis</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Temporal Trend Analysis
+              </CardTitle>
+              <CardDescription>NDVI, temperature, and soil moisture trends</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
+              <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={[
-                      { name: 'Zone 1', ndvi: 0.72, risk: 1 },
-                      { name: 'Zone 2', ndvi: 0.65, risk: 2 },
-                      { name: 'Zone 3', ndvi: 0.32, risk: 4 },
-                      { name: 'Zone 4', ndvi: 0.81, risk: 0 },
-                      { name: 'Zone 5', ndvi: 0.58, risk: 2 },
-                    ]}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  <LineChart
+                    data={reportData ? reportData.trendData : []}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis yAxisId="left" orientation="left" />
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <YAxis yAxisId="left" />
                     <YAxis yAxisId="right" orientation="right" />
-                    <Tooltip />
+                    <Tooltip 
+                      formatter={(value, name) => {
+                        if (name === 'ndvi') return [Number(value).toFixed(2), 'NDVI'];
+                        if (name === 'temp') return [Number(value).toFixed(1) + '°C', 'Temperature'];
+                        if (name === 'moisture') return [Number(value).toFixed(1) + '%', 'Moisture'];
+                        return [Number(value).toFixed(2), name];
+                      }}
+                      labelFormatter={(value) => `Date: ${new Date(value).toLocaleDateString()}`}
+                    />
                     <Legend />
-                    <Bar yAxisId="left" dataKey="ndvi" name="NDVI" fill="#3b82f6" />
-                    <Bar yAxisId="right" dataKey="risk" name="Risk Level" fill="#ef4444" />
-                  </BarChart>
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="ndvi" 
+                      name="NDVI" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      activeDot={{ r: 8 }} 
+                    />
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="temp" 
+                      name="Temperature (°C)" 
+                      stroke="#ef4444" 
+                      strokeWidth={2}
+                    />
+                    <Line 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="moisture" 
+                      name="Soil Moisture (%)" 
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
+          {/* Alerts */}
+          <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Environmental Conditions</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Recent Alerts
+              </CardTitle>
+              <CardDescription>Detected issues requiring attention</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-64 flex items-center justify-center">
-                <div className="grid grid-cols-2 gap-6 w-full">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <Droplets className="h-10 w-10 text-blue-600 mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-blue-600">30.9%</div>
-                    <div className="text-sm text-gray-600">Soil Moisture</div>
+              <div className="space-y-4">
+                {reportData && reportData.alerts.map((alert) => (
+                  <div 
+                    key={alert.id} 
+                    className={`p-4 rounded-lg border-l-4 ${
+                      alert.severity === "High" ? "border-l-red-500 bg-red-50" : 
+                      alert.severity === "Medium" ? "border-l-amber-500 bg-amber-50" : 
+                      "border-l-green-500 bg-green-50"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold">{alert.type} in {alert.zone}</h3>
+                        <p className="text-sm text-gray-600">{alert.message}</p>
+                      </div>
+                      <Badge className={
+                        alert.severity === "High" ? "bg-red-100 text-red-800" :
+                        alert.severity === "Medium" ? "bg-yellow-100 text-yellow-800" :
+                        "bg-green-100 text-green-800"
+                      }>
+                        {alert.severity} Risk
+                      </Badge>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      Detected on {new Date(alert.date).toLocaleDateString()}
+                    </div>
                   </div>
-                  <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <Thermometer className="h-10 w-10 text-red-600 mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-red-600">20.7°C</div>
-                    <div className="text-sm text-gray-600">Avg Temperature</div>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <Leaf className="h-10 w-10 text-green-600 mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-green-600">0.75</div>
-                    <div className="text-sm text-gray-600">Current NDVI</div>
-                  </div>
-                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                    <AlertTriangle className="h-10 w-10 text-yellow-600 mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-yellow-600">Medium</div>
-                    <div className="text-sm text-gray-600">Risk Level</div>
-                  </div>
-                </div>
+                )) || (
+                  <p className="text-gray-600 text-center py-4">No alerts detected</p>
+                )}
+              </div>
+              
+              <div className="mt-6 flex justify-center">
+                <Link href="/alerts">
+                  <Button variant="outline">
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    View All Alerts
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
         </div>
+      </div>
+      
+      {/* Footer */}
+      <div className="mt-12 pt-8 border-t border-gray-200 text-center text-gray-600 text-sm no-print">
+        <p>Report generated by KrishiDrishti AI-Powered Crop Health Monitoring System</p>
+        <p className="mt-2">© {new Date().getFullYear()} KrishiDrishti. All rights reserved.</p>
       </div>
     </div>
   );
