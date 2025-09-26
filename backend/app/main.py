@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware # For allowing frontend requests
-from app.api.routes import upload, analysis # Import your route modules
+from app.api.routes import upload, analysis, spectral, sensors # Import your route modules
 import logging
 
 # --- Logging Configuration ---
@@ -30,6 +30,8 @@ app.add_middleware(
 api_router = app # You could create a separate APIRouter instance if preferred
 api_router.include_router(upload.router, prefix="/api", tags=["upload"])
 api_router.include_router(analysis.router, prefix="/api", tags=["analysis"])
+api_router.include_router(spectral.router, prefix="/api", tags=["spectral"])
+api_router.include_router(sensors.router, prefix="/api", tags=["sensors"])
 
 # --- Root Endpoint ---
 @app.get("/")

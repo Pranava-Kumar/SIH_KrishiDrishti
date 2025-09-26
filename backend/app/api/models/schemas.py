@@ -1,7 +1,7 @@
 # backend/app/api/models/schemas.py
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any, List
 import uuid
 
 class UploadResponse(BaseModel):
@@ -27,3 +27,34 @@ class AnalysisResult(BaseModel):
 class ErrorResponse(BaseModel):
     """Response model for errors."""
     detail: str
+
+class SpectralAnalysisResponse(BaseModel):
+    """Response model for spectral analysis results."""
+    upload_id: str
+    file_info: Dict[str, Any]
+    indices: Dict[str, Any]  # Contains NDVI, NDRE, MSI, SAVI data
+    health_map_path: Optional[str] = None
+    timestamp: str = ""
+
+class TrendDataPoint(BaseModel):
+    """Data point for temporal trend data."""
+    date: str
+    value: float
+    index_type: str  # e.g., "ndvi", "soil_moisture", etc.
+
+class TrendDataResponse(BaseModel):
+    """Response model for temporal trend data."""
+    upload_id: str
+    index_type: str
+    data: List[TrendDataPoint]
+    timestamp: str = ""
+
+class AlertResponse(BaseModel):
+    """Response model for alerts."""
+    alert_id: str
+    upload_id: str
+    risk_type: str  # e.g., "pest_risk", "disease_risk", "stress"
+    risk_level: str  # e.g., "low", "medium", "high", "critical"
+    zone: str  # e.g., "Zone 1", "North field", etc.
+    recommendation: str
+    timestamp: str

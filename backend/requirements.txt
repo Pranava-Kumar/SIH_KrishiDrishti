@@ -8,3 +8,9 @@ numpy
 pandas
 python-multipart
 aiofiles
+rasterio
+opencv-python
+tensorflow
+scikit-learn
+matplotlib
+scipy

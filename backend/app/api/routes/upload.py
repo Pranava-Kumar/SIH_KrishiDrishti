@@ -22,11 +22,14 @@ async def upload_image(file: UploadFile = File(...)):
     # Generate a unique ID for this upload
     upload_id = str(uuid.uuid4())
 
+    # Handle case where filename might be None
+    filename = file.filename if file.filename is not None else "unnamed_file"
+
     try:
         # Save the file using the utility function
         file_path = await save_upload_file(file, upload_id)
         logger.info(f"File uploaded successfully with ID: {upload_id}, path: {file_path}")
-        return UploadResponse(upload_id=upload_id, filename=file.filename)
+        return UploadResponse(upload_id=upload_id, filename=filename)
     except Exception as e:
         logger.error(f"Error saving uploaded file: {e}")
         raise HTTPException(status_code=500, detail="Failed to save uploaded file.")
