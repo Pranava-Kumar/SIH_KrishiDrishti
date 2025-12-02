@@ -17,3 +17,9 @@ scipy
 h5py
 scikit-image
 joblib
+sqlalchemy
+psycopg2-binary
+passlib[bcrypt]
+python-jose[cryptography]
+reportlab
+slowapi

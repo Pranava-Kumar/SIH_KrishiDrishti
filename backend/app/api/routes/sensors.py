@@ -31,12 +31,12 @@ async def generate_sensor_data(request: SensorDataRequest):
         datetime.strptime(request.end_date, "%Y-%m-%d")
         
         # Generate sensor data
-        sensor_data = sensor_generator.generate_sensor_data(
+        sensor_data = sensor_generator.generate_daily_data(
             request.start_date,
             request.end_date,
-            request.field_id,
             request.crop_type,
-            request.location
+            request.location,
+            request.field_id
         )
         
         # Create a unique ID for this dataset
@@ -48,12 +48,17 @@ async def generate_sensor_data(request: SensorDataRequest):
         
         sensor_generator.save_sensor_data_to_csv(sensor_data, csv_path)
         
+        # Also save to JSON
+        json_path = os.path.join("data", "sensors", f"{dataset_id}_sensor_data.json")
+        sensor_generator.save_sensor_data_to_json(sensor_data, json_path)
+        
         logger.info(f"Generated sensor data for {request.field_id} from {request.start_date} to {request.end_date}")
         
         return {
             "dataset_id": dataset_id,
             "data_points": len(sensor_data),
-            "file_path": csv_path,
+            "csv_path": csv_path,
+            "json_path": json_path,
             "message": f"Successfully generated {len(sensor_data)} sensor data points"
         }
     
@@ -64,15 +69,12 @@ async def generate_sensor_data(request: SensorDataRequest):
 @router.get("/sensors/trends/{dataset_id}", response_model=TrendDataResponse)
 async def get_trend_data(
     dataset_id: str,
-    index_type: str = Query("ndvi", description="Type of index: ndvi, soil_moisture, temperature, humidity")
+    index_type: str = Query("temperature", description="Type of index: temperature, humidity, soil_moisture, soil_temperature, light_intensity, wind_speed, rainfall")
 ):
     """
     Get temporal trend data for visualization
     """
     try:
-        # In a real implementation, this would fetch from a database or CSV
-        # For now, we'll generate sample trend data
-        
         # Look for the sensor data file
         csv_path = os.path.join("data", "sensors", f"{dataset_id}_sensor_data.csv")
         
@@ -85,40 +87,19 @@ async def get_trend_data(
         # Convert to TrendDataPoint format based on index_type
         trend_data = []
         
-        if index_type == "soil_moisture":
+        if index_type in df.columns:
             for _, row in df.iterrows():
                 trend_data.append(TrendDataPoint(
                     date=row['date'],
-                    value=row['soil_moisture'],
+                    value=row[index_type],
                     index_type=index_type
                 ))
-        elif index_type == "temperature":
+        else:  # Default to temperature if index_type not found
             for _, row in df.iterrows():
                 trend_data.append(TrendDataPoint(
                     date=row['date'],
                     value=row['temperature'],
-                    index_type=index_type
-                ))
-        elif index_type == "humidity":
-            for _, row in df.iterrows():
-                trend_data.append(TrendDataPoint(
-                    date=row['date'],
-                    value=row['humidity'],
-                    index_type=index_type
-                ))
-        else:  # Default to NDVI-like data if not sensor data
-            # Generate sample NDVI data if we're showing spectral index trends
-            for _, row in df.iterrows():
-                # Generate a sample NDVI value based on conditions
-                temp_factor = (row['temperature'] - 20) / 10  # Normalize temperature effect
-                moisture_factor = (row['soil_moisture'] - 25) / 10  # Normalize moisture effect
-                sample_ndvi = 0.5 + temp_factor * 0.1 + moisture_factor * 0.1
-                sample_ndvi = max(-1, min(1, sample_ndvi))  # Clamp to [-1, 1]
-                
-                trend_data.append(TrendDataPoint(
-                    date=row['date'],
-                    value=sample_ndvi,
-                    index_type="ndvi"
+                    index_type="temperature"
                 ))
         
         response = TrendDataResponse(
@@ -133,6 +114,30 @@ async def get_trend_data(
     except Exception as e:
         logger.error(f"Error getting trend data: {e}")
         raise HTTPException(status_code=500, detail=f"Trend data retrieval failed: {str(e)}")
+
+@router.get("/sensors/data/{dataset_id}")
+async def get_sensor_data(dataset_id: str):
+    """
+    Get the full sensor data for a dataset
+    """
+    try:
+        json_path = os.path.join("data", "sensors", f"{dataset_id}_sensor_data.json")
+        
+        if not os.path.exists(json_path):
+            raise HTTPException(status_code=404, detail="Sensor data not found")
+        
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        return {
+            "dataset_id": dataset_id,
+            "data": data,
+            "count": len(data)
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting sensor data: {e}")
+        raise HTTPException(status_code=500, detail=f"Sensor data retrieval failed: {str(e)}")
 
 @router.post("/sensors/metadata", response_model=dict)
 async def create_field_metadata(field_metadata: dict):

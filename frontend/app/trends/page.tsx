@@ -14,7 +14,8 @@ import {
   Calendar,
   BarChart3,
   LineChart,
-  Activity
+  Activity,
+  Download
 } from 'lucide-react';
 import { 
   LineChart as RechartsLineChart, 
@@ -42,6 +43,7 @@ type TrendDataPoint = {
   ndre?: number;
   msi?: number;
   savi?: number;
+  evi?: number;
 };
 
 type TrendData = {
@@ -50,6 +52,12 @@ type TrendData = {
   soil_moisture: TrendDataPoint[];
   humidity: TrendDataPoint[];
   composite: TrendDataPoint[];
+  alerts: {
+    date: string;
+    type: string;
+    level: string;
+    message: string;
+  }[];
 };
 
 // Mock data for trends
@@ -95,14 +103,19 @@ const mockTrendData: TrendData = {
     { date: '2023-02-19', ndvi: 0.75, temp: 20.7, moisture: 30.9, humidity: 61 },
   ],
   composite: [
-    { date: '2023-01-01', ndvi: 0.42, temp: 18.5, moisture: 28.3, humidity: 65, ndre: 0.38, msi: 0.75, savi: 0.40 },
-    { date: '2023-01-08', ndvi: 0.48, temp: 19.2, moisture: 30.1, humidity: 62, ndre: 0.45, msi: 0.72, savi: 0.46 },
-    { date: '2023-01-15', ndvi: 0.55, temp: 20.1, moisture: 29.8, humidity: 60, ndre: 0.52, msi: 0.69, savi: 0.53 },
-    { date: '2023-01-22', ndvi: 0.61, temp: 22.4, moisture: 32.4, humidity: 58, ndre: 0.58, msi: 0.65, savi: 0.59 },
-    { date: '2023-01-29', ndvi: 0.65, temp: 24.6, moisture: 35.2, humidity: 55, ndre: 0.62, msi: 0.62, savi: 0.63 },
-    { date: '2023-02-05', ndvi: 0.68, temp: 21.3, moisture: 31.7, humidity: 59, ndre: 0.65, msi: 0.66, savi: 0.66 },
-    { date: '2023-02-12', ndvi: 0.72, temp: 19.8, moisture: 29.5, humidity: 63, ndre: 0.69, msi: 0.68, savi: 0.70 },
-    { date: '2023-02-19', ndvi: 0.75, temp: 20.7, moisture: 30.9, humidity: 61, ndre: 0.72, msi: 0.67, savi: 0.73 },
+    { date: '2023-01-01', ndvi: 0.42, temp: 18.5, moisture: 28.3, humidity: 65, ndre: 0.38, msi: 0.75, savi: 0.40, evi: 0.28 },
+    { date: '2023-01-08', ndvi: 0.48, temp: 19.2, moisture: 30.1, humidity: 62, ndre: 0.45, msi: 0.72, savi: 0.46, evi: 0.32 },
+    { date: '2023-01-15', ndvi: 0.55, temp: 20.1, moisture: 29.8, humidity: 60, ndre: 0.52, msi: 0.69, savi: 0.53, evi: 0.38 },
+    { date: '2023-01-22', ndvi: 0.61, temp: 22.4, moisture: 32.4, humidity: 58, ndre: 0.58, msi: 0.65, savi: 0.59, evi: 0.42 },
+    { date: '2023-01-29', ndvi: 0.65, temp: 24.6, moisture: 35.2, humidity: 55, ndre: 0.62, msi: 0.62, savi: 0.63, evi: 0.45 },
+    { date: '2023-02-05', ndvi: 0.68, temp: 21.3, moisture: 31.7, humidity: 59, ndre: 0.65, msi: 0.66, savi: 0.66, evi: 0.47 },
+    { date: '2023-02-12', ndvi: 0.72, temp: 19.8, moisture: 29.5, humidity: 63, ndre: 0.69, msi: 0.68, savi: 0.70, evi: 0.51 },
+    { date: '2023-02-19', ndvi: 0.75, temp: 20.7, moisture: 30.9, humidity: 61, ndre: 0.72, msi: 0.67, savi: 0.73, evi: 0.53 },
+  ],
+  alerts: [
+    { date: '2023-01-29', type: 'moisture_stress', level: 'high', message: 'High moisture stress detected in northern section' },
+    { date: '2023-02-12', type: 'pest_disease_risk', level: 'medium', message: 'Medium risk of pest infestation in central section' },
+    { date: '2023-02-19', type: 'nutrient_deficiency', level: 'low', message: 'Low nitrogen levels detected in eastern section' },
   ]
 };
 
@@ -546,8 +559,8 @@ export default function TrendsPage() {
               <Eye className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.latest ? stats.latest.toFixed(2) : "N/A"}</div>
-              <p className="text-xs text-gray-600">Latest reading</p>
+              <div className="text-2xl font-bold">{mockTrendData.composite[mockTrendData.composite.length - 1]?.ndvi?.toFixed(2) || "N/A"}</div>
+              <p className="text-xs text-gray-600">Normalized diff vegetation index</p>
             </CardContent>
           </Card>
           
@@ -557,7 +570,7 @@ export default function TrendsPage() {
               <Leaf className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockReportData.composite[mockReportData.composite.length - 1]?.ndre?.toFixed(2) || "N/A"}</div>
+              <div className="text-2xl font-bold">{mockTrendData.composite[mockTrendData.composite.length - 1]?.ndre?.toFixed(2) || "N/A"}</div>
               <p className="text-xs text-gray-600">Red edge index</p>
             </CardContent>
           </Card>
@@ -568,7 +581,7 @@ export default function TrendsPage() {
               <Droplets className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockReportData.composite[mockReportData.composite.length - 1]?.msi?.toFixed(2) || "N/A"}</div>
+              <div className="text-2xl font-bold">{mockTrendData.composite[mockTrendData.composite.length - 1]?.msi?.toFixed(2) || "N/A"}</div>
               <p className="text-xs text-gray-600">Moisture stress index</p>
             </CardContent>
           </Card>
@@ -579,8 +592,19 @@ export default function TrendsPage() {
               <Activity className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockReportData.composite[mockReportData.composite.length - 1]?.savi?.toFixed(2) || "N/A"}</div>
+              <div className="text-2xl font-bold">{mockTrendData.composite[mockTrendData.composite.length - 1]?.savi?.toFixed(2) || "N/A"}</div>
               <p className="text-xs text-gray-600">Soil adjusted vegetation</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">EVI</CardTitle>
+              <Activity className="h-4 w-4 text-indigo-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{mockTrendData.composite[mockTrendData.composite.length - 1]?.evi?.toFixed(2) || "N/A"}</div>
+              <p className="text-xs text-gray-600">Enhanced vegetation index</p>
             </CardContent>
           </Card>
         </div>

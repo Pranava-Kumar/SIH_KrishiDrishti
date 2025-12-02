@@ -1,149 +1,209 @@
-import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
+"""
+Synthetic Sensor Data Generator for KrishiDrishti
+This module generates realistic sensor data for temperature, humidity, soil moisture, and other environmental factors
+"""
 import random
-import os
-import json
+import numpy as np
+from datetime import datetime, timedelta
 from typing import List, Dict, Any
+import pandas as pd
+import json
 
 class SensorDataGenerator:
     """
-    Generates synthetic sensor data for the MVP (soil moisture, temperature, humidity)
+    Generates synthetic sensor data for agricultural monitoring
     """
     
     def __init__(self):
-        pass
+        # Base values for different sensor types
+        self.base_values = {
+            "temperature": 25.0,  # Celsius
+            "humidity": 60.0,     # Percentage
+            "soil_moisture": 35.0,  # Percentage
+            "soil_temperature": 22.0,  # Celsius
+            "light_intensity": 500.0,  # Lux
+            "wind_speed": 3.0,    # m/s
+            "rainfall": 0.0       # mm
+        }
+        
+        # Default crop types with specific parameters
+        self.crop_params = {
+            "corn": {
+                "optimal_temperature": (20, 30),
+                "optimal_moisture": (30, 45),
+                "optimal_humidity": (50, 80)
+            },
+            "wheat": {
+                "optimal_temperature": (15, 25),
+                "optimal_moisture": (25, 40),
+                "optimal_humidity": (40, 70)
+            },
+            "rice": {
+                "optimal_temperature": (20, 35),
+                "optimal_moisture": (40, 60),
+                "optimal_humidity": (70, 90)
+            },
+            "soybean": {
+                "optimal_temperature": (20, 30),
+                "optimal_moisture": (35, 50),
+                "optimal_humidity": (60, 85)
+            }
+        }
     
-    def generate_sensor_data(
-        self,
-        start_date: str,
-        end_date: str,
-        field_id: str = "field_1",
-        crop_type: str = "corn",
-        location: str = "default"
+    def generate_daily_data(
+        self, 
+        start_date: str, 
+        end_date: str, 
+        crop_type: str = "corn", 
+        location: str = "default",
+        field_id: str = "field_1"
     ) -> List[Dict[str, Any]]:
         """
         Generate synthetic sensor data for a date range
         """
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        end = datetime.strptime(end_date, "%Y-%m-%d")
+        start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
         
+        # Calculate number of days
+        num_days = (end - start).days + 1
+        days = [start + timedelta(days=i) for i in range(num_days)]
+        
+        # Get crop parameters
+        crop_params = self.crop_params.get(crop_type.lower(), self.crop_params["corn"])
+        
+        # Generate data for each day
         data = []
-        current_date = start
-        
-        while current_date <= end:
-            # Generate realistic values based on crop type and environmental factors
-            base_temp = self._get_base_temperature(crop_type)
-            base_moisture = self._get_base_moisture(crop_type)
-            base_humidity = self._get_base_humidity(crop_type)
+        for i, day in enumerate(days):
+            # Base values with some variation
+            temp = self._generate_temperature(i, crop_params["optimal_temperature"])
+            humidity = self._generate_humidity(i, crop_params["optimal_humidity"], temp)
+            soil_moisture = self._generate_soil_moisture(i, crop_params["optimal_moisture"])
             
-            # Add some random variation and daily patterns
-            day_offset = (current_date - start).days
-            temp = base_temp + random.uniform(-5, 5) + 2 * np.sin(2 * np.pi * day_offset / 365.25)
-            soil_moisture = base_moisture + random.uniform(-10, 10) + 5 * np.sin(2 * np.pi * day_offset / 30)
-            humidity = base_humidity + random.uniform(-15, 15) + 10 * np.sin(2 * np.pi * day_offset / 7)
+            # Other sensor values based on environmental conditions
+            soil_temp = temp - random.uniform(2, 5)  # Soil temp is typically a bit lower
+            light_intensity = self._generate_light_intensity(i, temp, humidity)
+            wind_speed = random.uniform(1.0, 6.0)
             
-            # Ensure values stay in realistic ranges
-            temp = max(0, min(45, temp))  # Temperature in Celsius
-            soil_moisture = max(5, min(50, soil_moisture))  # Soil moisture percentage
-            humidity = max(20, min(95, humidity))  # Humidity percentage
+            # Rainfall (0 on most days, higher on some)
+            rainfall = 0.0
+            if random.random() < 0.2:  # 20% chance of rain
+                rainfall = random.uniform(2.0, 15.0)
             
-            data_point = {
-                "date": current_date.strftime("%Y-%m-%d"),
+            day_data = {
+                "date": day.strftime("%Y-%m-%d"),
                 "field_id": field_id,
-                "crop_type": crop_type,
                 "location": location,
+                "crop_type": crop_type,
                 "temperature": round(temp, 2),
-                "soil_moisture": round(soil_moisture, 2),
                 "humidity": round(humidity, 2),
-                "timestamp": current_date.isoformat()
+                "soil_moisture": round(soil_moisture, 2),
+                "soil_temperature": round(soil_temp, 2),
+                "light_intensity": round(light_intensity, 2),
+                "wind_speed": round(wind_speed, 2),
+                "rainfall": round(rainfall, 2),
+                "timestamp": datetime.now().isoformat()
             }
             
-            data.append(data_point)
-            current_date += timedelta(days=1)
+            data.append(day_data)
         
         return data
     
-    def _get_base_temperature(self, crop_type: str) -> float:
-        """Get base temperature for a specific crop type"""
-        base_temps = {
-            "corn": 25.0,
-            "wheat": 20.0,
-            "rice": 28.0,
-            "soybean": 24.0,
-            "cotton": 26.0,
-            "sugarcane": 30.0,
-            "tomato": 22.0,
-            "potato": 18.0,
-            "apple": 15.0,
-            "grape": 20.0
-        }
-        return base_temps.get(crop_type.lower(), 22.0)  # Default to 22°C
-    
-    def _get_base_moisture(self, crop_type: str) -> float:
-        """Get base soil moisture for a specific crop type"""
-        base_moistures = {
-            "corn": 30.0,
-            "wheat": 25.0,
-            "rice": 40.0,
-            "soybean": 28.0,
-            "cotton": 22.0,
-            "sugarcane": 35.0,
-            "tomato": 26.0,
-            "potato": 24.0,
-            "apple": 20.0,
-            "grape": 18.0
-        }
-        return base_moistures.get(crop_type.lower(), 25.0)  # Default to 25%
-    
-    def _get_base_humidity(self, crop_type: str) -> float:
-        """Get base humidity for a specific crop type"""
-        base_humidities = {
-            "corn": 65.0,
-            "wheat": 60.0,
-            "rice": 75.0,
-            "soybean": 70.0,
-            "cotton": 55.0,
-            "sugarcane": 80.0,
-            "tomato": 68.0,
-            "potato": 72.0,
-            "apple": 50.0,
-            "grape": 45.0
-        }
-        return base_humidities.get(crop_type.lower(), 65.0)  # Default to 65%
-    
-    def generate_field_metadata(
-        self,
-        field_id: str,
-        crop_type: str,
-        planting_date: str,
-        area_hectares: float,
-        coordinates: Dict[str, float] = None
-    ) -> Dict[str, Any]:
-        """Generate field metadata"""
-        if coordinates is None:
-            coordinates = {"lat": 20.5937, "lng": 78.9629}  # Default to India center
+    def _generate_temperature(self, day_index: int, optimal_range: tuple) -> float:
+        """
+        Generate temperature value with seasonal variation
+        """
+        # Base temperature with seasonal variation
+        seasonal_factor = 5 * np.sin(2 * np.pi * day_index / 365)  # Seasonal variation
         
-        return {
-            "field_id": field_id,
-            "crop_type": crop_type,
-            "planting_date": planting_date,
-            "area_hectares": area_hectares,
-            "coordinates": coordinates,
-            "created_at": datetime.now().isoformat()
-        }
+        # Add some random variation
+        random_factor = random.uniform(-3, 3)
+        
+        # Calculate base with optimal range
+        optimal_min, optimal_max = optimal_range
+        base_temp = (optimal_min + optimal_max) / 2
+        
+        temp = base_temp + seasonal_factor + random_factor
+        
+        # Ensure within reasonable bounds
+        temp = max(-10, min(50, temp))
+        
+        return temp
     
-    def save_sensor_data_to_csv(self, data: List[Dict[str, Any]], filepath: str):
-        """Save sensor data to CSV file"""
+    def _generate_humidity(self, day_index: int, optimal_range: tuple, temperature: float) -> float:
+        """
+        Generate humidity value correlated with temperature
+        """
+        optimal_min, optimal_max = optimal_range
+        base_humidity = (optimal_min + optimal_max) / 2
+        
+        # Humidity generally inversely related to temperature
+        temp_factor = -0.3 * (temperature - 25)  # Lower humidity with higher temperature
+        
+        # Seasonal variation
+        seasonal_factor = 10 * np.sin(2 * np.pi * day_index / 365 + np.pi)  # Opposite of temperature
+        
+        # Random variation
+        random_factor = random.uniform(-10, 10)
+        
+        humidity = base_humidity + temp_factor + seasonal_factor + random_factor
+        
+        # Ensure within bounds
+        humidity = max(10, min(95, humidity))
+        
+        return humidity
+    
+    def _generate_soil_moisture(self, day_index: int, optimal_range: tuple) -> float:
+        """
+        Generate soil moisture value
+        """
+        optimal_min, optimal_max = optimal_range
+        base_moisture = (optimal_min + optimal_max) / 2
+        
+        # Correlate with rainfall and evaporation
+        # More moisture after rain, less with higher temperature
+        rainfall_effect = random.uniform(-5, 15) if random.random() < 0.2 else random.uniform(-2, 5)
+        temp_effect = -0.2 * max(0, self.base_values["temperature"] - 20)  # Evaporation with heat
+        
+        moisture = base_moisture + rainfall_effect + temp_effect
+        
+        # Ensure within bounds
+        moisture = max(5, min(70, moisture))
+        
+        return moisture
+    
+    def _generate_light_intensity(self, day_index: int, temperature: float, humidity: float) -> float:
+        """
+        Generate light intensity value
+        """
+        # Base value with seasonal variation (longer days in summer)
+        seasonal_factor = 200 * np.sin(2 * np.pi * day_index / 365)  # Seasonal variation
+        
+        # Light affects temperature
+        temp_factor = 10 * max(0, temperature - 15)  # More light means more heat
+        
+        # Random variation
+        random_factor = random.uniform(-100, 100)
+        
+        light = 500 + seasonal_factor + temp_factor + random_factor
+        
+        # Ensure within reasonable bounds
+        light = max(100, min(1200, light))
+        
+        return light
+    
+    def save_sensor_data_to_csv(self, data: List[Dict[str, Any]], file_path: str):
+        """
+        Save sensor data to CSV file
+        """
         df = pd.DataFrame(data)
-        df.to_csv(filepath, index=False)
-        return filepath
+        df.to_csv(file_path, index=False)
     
-    def save_metadata_to_json(self, metadata: Dict[str, Any], filepath: str):
-        """Save metadata to JSON file"""
-        with open(filepath, 'w') as f:
-            json.dump(metadata, f, indent=2)
-        return filepath
+    def save_sensor_data_to_json(self, data: List[Dict[str, Any]], file_path: str):
+        """
+        Save sensor data to JSON file
+        """
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=2)
 
 # Initialize the sensor data generator
 sensor_generator = SensorDataGenerator()
